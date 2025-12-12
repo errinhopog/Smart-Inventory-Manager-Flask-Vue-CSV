@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.env
+
+# VS Code
+.vscode/
+
+# Dados e Backups (Não enviar para o GitHub)
+backups/
+uploads/*.csv
+!uploads/.gitkeep
+
+# Imagens enviadas pelo usuário (Manter apenas assets do sistema se houver)
+static/images/*.jpg
+static/images/*.png
+static/images/*.jpeg
+
+# Sistema Operacional
+Thumbs.db
+.DS_Store

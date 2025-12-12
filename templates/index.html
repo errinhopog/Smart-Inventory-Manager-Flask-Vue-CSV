@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AquaFlora Agroshop - Sistema de Estoque</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#10B981">
+
+    <!-- Scanner Library -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Register Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/sw.js');
+        }
+
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: 'var(--color-primary)',
+                        secondary: 'var(--color-secondary)',
+                        dark: '#1a1d21'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Libraries -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        :root {
+            --color-primary: #10B981;
+            --color-secondary: #0ea5e9;
+        }
+        [v-cloak] { display: none; }
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 3px solid #3498db;
+            width: 20px;
+            height: 20px;
+            -webkit-animation: spin 1s linear infinite; /* Safari */
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8; 
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans">
+    <div id="app" v-cloak class="min-h-screen flex flex-col">
+        
+        <!-- Login Modal -->
+        <div v-if="!isAuthenticated" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-sm w-full p-8 transform transition-all">
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-lock text-2xl text-primary"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Acesso Restrito</h2>
+                    <p class="text-gray-500 dark:text-gray-400 mt-2">Digite a senha para acessar o sistema</p>
+                </div>
+                
+                <form @submit.prevent="login" class="space-y-4">
+                    <div>
+                        <input 
+                            v-model="password" 
+                            type="password" 
+                            class="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
+                            placeholder="Senha de acesso"
+                            autofocus
+                        >
+                    </div>
+                    <button 
+                        type="submit" 
+                        class="w-full py-3 px-4 bg-primary hover:bg-green-600 text-white rounded-lg font-bold transition-colors shadow-lg shadow-primary/30"
+                    >
+                        Entrar
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Navbar -->
+        <nav class="bg-gray-900 text-white shadow-lg sticky top-0 z-50">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16 items-center">
+                    <!-- Logo -->
+                    <a href="/" class="flex items-center gap-3 hover:opacity-90 transition-opacity" title="Voltar ao Início">
+                        <img src="/static/logo.png" alt="AquaFlora Agroshop" class="h-14 w-auto object-contain">
+                        <span class="font-bold text-2xl tracking-tight hidden sm:block">AquaFlora <span class="font-light">Agroshop</span></span>
+                    </a>
+
+                    <!-- Right Actions -->
+                    <div class="flex items-center gap-4">
+                        <!-- Dashboard Button -->
+                        <button @click="openDashboard" class="p-2 text-gray-400 hover:text-white transition-colors" title="Dashboard">
+                            <i class="fas fa-chart-pie text-xl"></i>
+                        </button>
+
+                        <!-- Scanner Button -->
+                        <button @click="startScanner" class="p-2 text-gray-400 hover:text-white transition-colors" title="Ler Código de Barras">
+                            <i class="fas fa-barcode text-xl"></i>
+                        </button>
+
+                        <!-- Theme Selector -->
+                        <div class="relative">
+                            <button 
+                                @click="showThemeMenu = !showThemeMenu" 
+                                @blur="setTimeout(() => showThemeMenu = false, 200)"
+                                class="p-2 text-gray-400 hover:text-white transition-colors focus:outline-none" 
+                                title="Mudar Tema"
+                            >
+                                <i class="fas fa-palette"></i>
+                            </button>
+                            <div 
+                                v-if="showThemeMenu"
+                                class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl py-2 border border-gray-100 z-50"
+                            >
+                                <div class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Temas</div>
+                                <button 
+                                    v-for="(theme, key) in themes" 
+                                    :key="key"
+                                    @click="setTheme(key); showThemeMenu = false"
+                                    class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+                                    :class="currentTheme === key ? 'text-primary font-bold' : 'text-gray-700'"
+                                >
+                                    <div class="w-4 h-4 rounded-full border border-gray-200" :style="{ backgroundColor: theme.colors.primary }"></div>
+                                    [[ theme.name ]]
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Upload Button -->
+                        <button @click="showUploadModal = true" class="flex items-center gap-2 px-3 py-2 sm:px-4 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors shadow-sm font-medium text-sm" style="background-color: var(--color-primary) !important;">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <span class="hidden sm:inline">Atualizar Estoque</span>
+                        </button>
+                        
+                        <button @click="logout" class="p-2 text-gray-400 hover:text-white transition-colors" title="Sair">
+                            <i class="fas fa-sign-out-alt"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+            
+            <!-- Search & Filter Section -->
+            <div class="bg-white rounded-xl shadow-sm mb-6 border border-gray-200 overflow-hidden">
+                <div class="flex flex-col md:flex-row">
+                    <!-- Search Input -->
+                    <div class="flex-1 flex items-center px-4 py-1 border-b md:border-b-0 md:border-r border-gray-100">
+                        <i class="fas fa-search text-gray-400 mr-3 text-lg"></i>
+                        <input 
+                            v-model="search" 
+                            type="text" 
+                            class="w-full py-3 bg-transparent focus:outline-none text-gray-700 placeholder-gray-400 text-base" 
+                            placeholder="Buscar por nome, SKU ou marca..."
+                        >
+                        <button v-if="search" @click="search = ''" class="text-gray-400 hover:text-gray-600 p-2">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- Category Select -->
+                    <div class="w-full md:w-64 px-4 py-1 border-b md:border-b-0 md:border-r border-gray-100 bg-gray-50/50 md:bg-white category-select-container">
+                        <select v-model="selectedCategory" class="w-full py-3 bg-transparent focus:outline-none text-gray-700 cursor-pointer text-base">
+                            <option value="">Todas as Categorias</option>
+                            <option v-for="cat in categories" :key="cat" :value="cat">[[ cat ]]</option>
+                        </select>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex items-center p-2 gap-2 bg-gray-50 md:bg-white">
+                        <!-- Bulk Print Button -->
+                        <button 
+                            v-if="selectedItems.length > 0"
+                            @click="printSelectedLabels" 
+                            class="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition-all shadow-sm flex items-center gap-2"
+                            title="Imprimir Selecionados"
+                        >
+                            <i class="fas fa-print"></i>
+                            <span class="text-sm">Imprimir ([[ selectedItems.length ]])</span>
+                        </button>
+
+                        <!-- Conference Mode Button -->
+                        <button 
+                            @click="startConference" 
+                            class="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold transition-all shadow-sm flex items-center gap-2"
+                            title="Modo Conferência"
+                        >
+                            <i class="fas fa-clipboard-check"></i>
+                            <span class="text-sm hidden md:inline">Conferência</span>
+                        </button>
+
+                        <button 
+                            @click="toggleLowStock" 
+                            class="flex-1 md:flex-none px-4 py-2.5 rounded-lg font-bold transition-all shadow-sm flex items-center justify-center gap-2 border"
+                            :class="onlyLowStock ? 'bg-red-600 border-red-600 text-white hover:bg-red-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'"
+                            title="Filtrar Estoque Baixo"
+                        >
+                            <i class="fas fa-exclamation-triangle" :class="onlyLowStock ? 'animate-pulse' : ''"></i>
+                            <span class="text-sm whitespace-nowrap">Reposição</span>
+                        </button>
+
+                        <button 
+                            @click="resetFilters" 
+                            class="px-4 py-2.5 text-gray-500 hover:text-gray-700 bg-white hover:bg-gray-100 rounded-lg transition-colors border border-gray-200 shadow-sm" 
+                            title="Limpar Filtros"
+                        >
+                            <i class="fas fa-undo"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Last Update Info -->
+            <div v-if="lastUpdate" class="flex justify-end mb-4 px-2">
+                <span class="text-xs text-gray-500 bg-white px-3 py-1 rounded-full shadow-sm border border-gray-100 flex items-center gap-2">
+                    <i class="far fa-clock text-primary"></i>
+                    Atualizado em: <strong>[[ lastUpdate ]]</strong>
+                </span>
+            </div>
+
+            <!-- Loading State -->
+            <div v-if="loading" class="flex flex-col items-center justify-center py-20">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                <p class="mt-4 text-gray-500">Carregando estoque...</p>
+            </div>
+
+            <div v-else>
+                <!-- Selection Header -->
+                <div v-if="filteredProducts.length > 0" class="mb-4 flex items-center gap-2 px-2">
+                    <input 
+                        type="checkbox" 
+                        :checked="allSelected" 
+                        @change="toggleSelectAll"
+                        class="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                    >
+                    <span class="text-sm text-gray-600">Selecionar todos desta página</span>
+                </div>
+
+                <!-- Products Grid -->
+                <div v-if="filteredProducts.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <div 
+                        v-for="product in paginatedProducts" 
+                        :key="product.SKU" 
+                        @click="openProductDetails(product)"
+                        class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col h-full group relative cursor-pointer"
+                        :class="{'ring-2 ring-primary': selectedItems.includes(product.SKU)}"
+                    >
+                        <!-- Checkbox -->
+                        <div class="absolute top-2 left-2 z-20" @click.stop>
+                            <input 
+                                type="checkbox" 
+                                :checked="selectedItems.includes(product.SKU)"
+                                @change="toggleSelection(product.SKU)"
+                                class="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer shadow-sm"
+                            >
+                        </div>
+                        
+                        <!-- Print Button -->
+                        <button 
+                            @click.stop="printLabel(product)" 
+                            class="absolute top-2 left-10 z-10 w-8 h-8 flex items-center justify-center bg-white/90 hover:bg-white text-gray-700 hover:text-black rounded-lg shadow-sm border border-gray-200 transition-all opacity-0 group-hover:opacity-100"
+                            title="Imprimir Etiqueta"
+                        >
+                            <i class="fas fa-print"></i>
+                        </button>
+
+                        <!-- SKU Badge -->
+                        <div class="absolute top-2 right-2 z-10">
+                            <span class="px-2 py-1 bg-gray-900/70 text-white text-xs font-bold rounded backdrop-blur-sm shadow-sm border border-white/10">
+                                SKU: [[ product.SKU ]]
+                            </span>
+                        </div>
+
+                        <!-- Image Area -->
+                        <div class="h-48 sm:h-56 p-4 flex items-center justify-center bg-white relative">
+                            <img :src="getImageUrl(product.SKU)" class="max-h-full max-w-full object-contain" alt="Produto" @error="handleImageError">
+                        </div>
+
+                        <!-- Content -->
+                        <div class="p-4 sm:p-5 flex-1 flex flex-col border-t border-gray-50">
+                            <!-- Category -->
+                            <div class="text-[11px] font-bold text-secondary uppercase tracking-wider mb-1">
+                                [[ product.Categories || 'GERAL' ]]
+                            </div>
+                            
+                            <!-- Name -->
+                            <h3 class="text-sm font-bold text-gray-800 mb-4 line-clamp-2 leading-relaxed flex-1" :title="product.Name">
+                                [[ product.Name ]]
+                            </h3>
+                            
+                            <!-- Price & Stock Row -->
+                            <div class="flex items-end justify-between mt-auto pt-2">
+                                <div>
+                                    <div class="text-[10px] text-gray-400 font-medium uppercase">Preço</div>
+                                    <div class="text-lg font-bold text-gray-800">R$ [[ formatPrice(product['Regular price']) ]]</div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-[10px] text-gray-400 font-medium uppercase">Estoque</div>
+                                    <div :class="Number(product.Stock) > 0 ? 'text-green-600' : 'text-red-500'" class="text-sm font-bold">
+                                        [[ Number(product.Stock) ]] un
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Empty State -->
+                <div v-else class="text-center py-20">
+                    <div class="inline-block p-6 rounded-full bg-gray-100 mb-4">
+                        <i class="fas fa-search text-4xl text-gray-400"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">Nenhum produto encontrado</h3>
+                    <p class="text-gray-500">
+                        [[ products.length === 0 ? 'Faça o upload de um arquivo CSV para começar.' : 'Tente ajustar seus filtros de busca.' ]]
+                    </p>
+                </div>
+
+                <!-- Pagination -->
+                <div v-if="totalPages > 1" class="mt-10 flex justify-center gap-2">
+                    <button 
+                        @click="currentPage--" 
+                        :disabled="currentPage === 1"
+                        class="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 disabled:opacity-50 hover:bg-gray-50 transition-colors"
+                    >
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <span class="px-4 h-10 flex items-center justify-center rounded-lg bg-white border border-gray-200 font-medium text-gray-600">
+                        Página [[ currentPage ]] de [[ totalPages ]]
+                    </span>
+                    <button 
+                        @click="currentPage++" 
+                        :disabled="currentPage === totalPages"
+                        class="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 disabled:opacity-50 hover:bg-gray-50 transition-colors"
+                    >
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Upload Modal -->
+        <div v-if="showUploadModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="showUploadModal = false">
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-md w-full p-4 sm:p-6 transform transition-all">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white">Atualizar Estoque</h3>
+                    <button @click="showUploadModal = false" class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-lg p-6 sm:p-8 text-center hover:border-primary transition-colors cursor-pointer" @click="$refs.fileInput.click()" @dragover.prevent @drop.prevent="handleDrop">
+                        <input type="file" ref="fileInput" class="hidden" accept=".csv" @change="handleFileSelect">
+                        <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-3"></i>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                            <span v-if="selectedFile">[[ selectedFile.name ]]</span>
+                            <span v-else>Clique para selecionar ou arraste o arquivo CSV aqui</span>
+                        </p>
+                    </div>
+                    
+                    <div class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg text-xs text-blue-700 dark:text-blue-300">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        O arquivo deve ser um CSV gerado pelo sistema de estoque.
+                    </div>
+
+                    <button 
+                        @click="uploadFile" 
+                        :disabled="!selectedFile || uploading"
+                        class="w-full py-3 px-4 bg-primary hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-bold transition-colors flex items-center justify-center gap-2"
+                    >
+                        <span v-if="uploading" class="loader border-white border-t-transparent"></span>
+                        <span v-else>Processar Arquivo</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scanner Modal -->
+        <div v-if="showScanner" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm" @click.self="stopScanner">
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-lg w-full p-4 sm:p-6 relative flex flex-col max-h-[90vh]">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white">Escanear Código</h3>
+                    <button @click="stopScanner" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 z-10 p-2">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <div class="relative flex-1 bg-black rounded-lg overflow-hidden flex items-center justify-center min-h-[300px]">
+                    <div id="reader" class="w-full h-full"></div>
+                </div>
+                
+                <div class="mt-4 flex flex-col gap-3">
+                    <p class="text-center text-sm text-gray-500">Aponte a câmera para o código de barras</p>
+                    
+                    <button 
+                        v-if="cameras.length > 1" 
+                        @click="switchCamera" 
+                        class="w-full py-3 bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-800 dark:text-white rounded-lg font-bold transition-colors flex items-center justify-center gap-2"
+                    >
+                        <i class="fas fa-sync-alt"></i>
+                        Trocar Câmera
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Product Details Modal -->
+        <div v-if="showProductModal" class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" @click.self="closeProductModal">
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto transform transition-all flex flex-col md:flex-row">
+                
+                <!-- Image Section -->
+                <div class="w-full md:w-1/3 bg-gray-50 p-8 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-gray-100 relative group">
+                    <img :src="getImageUrl(selectedProduct.SKU)" class="max-h-64 object-contain mb-4" @error="handleImageError">
+                    
+                    <!-- Image Upload -->
+                    <div class="w-full mt-auto">
+                        <label class="cursor-pointer w-full flex items-center justify-center gap-2 py-2 px-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors text-sm text-gray-600">
+                            <i class="fas fa-camera"></i>
+                            <span>Alterar Foto</span>
+                            <input type="file" class="hidden" accept="image/*" @change="handleImageUpload($event, selectedProduct.SKU)">
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Info Section -->
+                <div class="w-full md:w-2/3 p-6 md:p-8">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <span class="text-xs font-bold text-primary uppercase tracking-wider bg-primary/10 px-2 py-1 rounded">
+                                [[ selectedProduct.Categories || 'GERAL' ]]
+                            </span>
+                            <h2 class="text-2xl font-bold text-gray-900 dark:text-white mt-2">[[ selectedProduct.Name ]]</h2>
+                            <p class="text-sm text-gray-500 mt-1">SKU: [[ selectedProduct.SKU ]]</p>
+                        </div>
+                        <button @click="closeProductModal" class="text-gray-400 hover:text-gray-600 p-2">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="bg-gray-50 dark:bg-slate-700 p-4 rounded-lg">
+                            <div class="text-xs text-gray-500 uppercase font-bold">Preço Venda</div>
+                            <div class="text-2xl font-bold text-gray-900 dark:text-white">R$ [[ formatPrice(selectedProduct['Regular price']) ]]</div>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-slate-700 p-4 rounded-lg">
+                            <div class="text-xs text-gray-500 uppercase font-bold">Estoque</div>
+                            <div class="text-2xl font-bold" :class="Number(selectedProduct.Stock) > 0 ? 'text-green-600' : 'text-red-500'">
+                                [[ Number(selectedProduct.Stock) ]] un
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Price History -->
+                    <div v-if="priceHistory.length > 0" class="mb-6">
+                        <h3 class="text-sm font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                            <i class="fas fa-chart-line text-primary"></i> Histórico de Preços
+                        </h3>
+                        <div class="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 overflow-x-auto">
+                            <div class="flex items-end gap-4 h-32 min-w-[300px]">
+                                <div v-for="(point, index) in priceHistory" :key="index" class="flex flex-col items-center gap-1 flex-1 group">
+                                    <div class="text-[10px] font-bold text-gray-600 dark:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity">R$[[ point.price ]]</div>
+                                    <div class="w-full bg-primary/20 hover:bg-primary/40 rounded-t transition-colors relative" :style="{ height: (parseFloat(point.price.replace(',', '.')) / parseFloat(selectedProduct['Regular price'].replace(',', '.')) * 80) + '%' }"></div>
+                                    <div class="text-[10px] text-gray-400 whitespace-nowrap">[[ point.date ]]</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-8 flex gap-3">
+                        <button @click="printLabel(selectedProduct)" class="flex-1 bg-gray-900 hover:bg-black text-white py-3 rounded-lg font-bold transition-colors flex items-center justify-center gap-2">
+                            <i class="fas fa-print"></i> Imprimir Etiqueta
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Conference Modal -->
+        <div v-if="showConferenceModal" class="fixed inset-0 z-[80] flex flex-col bg-white dark:bg-slate-900">
+            <!-- Header -->
+            <div class="bg-primary text-white p-4 flex justify-between items-center shadow-md">
+                <h2 class="text-xl font-bold flex items-center gap-2">
+                    <i class="fas fa-clipboard-check"></i> Conferência de Estoque
+                </h2>
+                <button @click="stopConference" class="bg-white/20 hover:bg-white/30 p-2 rounded-lg transition-colors">
+                    <i class="fas fa-times"></i> Fechar
+                </button>
+            </div>
+
+            <!-- Scanner Area -->
+            <div class="bg-black relative h-64 flex-shrink-0">
+                <div id="reader" class="w-full h-full object-cover"></div>
+                <div class="absolute bottom-4 right-4 flex gap-2 z-10">
+                    <button @click="switchCamera" class="bg-white/20 backdrop-blur-md p-3 rounded-full text-white hover:bg-white/30 transition-all">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- List -->
+            <div class="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-slate-800">
+                <div v-if="conferenceItems.length === 0" class="text-center py-10 text-gray-400">
+                    <i class="fas fa-barcode text-4xl mb-3"></i>
+                    <p>Bipe os produtos para começar a contagem</p>
+                </div>
+                <div v-else class="space-y-3">
+                    <div v-for="item in conferenceItems" :key="item.sku" class="bg-white dark:bg-slate-700 p-4 rounded-lg shadow-sm flex justify-between items-center border-l-4 border-primary">
+                        <div class="flex-1">
+                            <div class="font-bold text-gray-900 dark:text-white">[[ item.name ]]</div>
+                            <div class="text-xs text-gray-500">SKU: [[ item.sku ]]</div>
+                        </div>
+                        <div class="flex flex-col items-end ml-4">
+                            <div class="text-2xl font-bold text-primary">[[ item.count ]]</div>
+                            <div class="text-xs text-gray-400">Sistema: [[ item.systemStock ]]</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Modal -->
+        <div v-if="showDashboardModal" class="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" @click.self="showDashboardModal = false">
+            <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+                <div class="p-6 md:p-8">
+                    <div class="flex justify-between items-center mb-8">
+                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                            <i class="fas fa-chart-pie text-primary"></i>
+                            Dashboard Gerencial
+                        </h2>
+                        <button @click="showDashboardModal = false" class="text-gray-400 hover:text-gray-600 p-2">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+
+                    <!-- Stats Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <!-- Total Value -->
+                        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+                            <div class="text-blue-100 text-sm font-bold uppercase tracking-wider mb-1">Valor Total em Estoque</div>
+                            <div class="text-3xl font-black">R$ [[ formatPrice(dashboardStats.total_value) ]]</div>
+                            <div class="mt-2 text-xs text-blue-100 opacity-80">Baseado no preço de venda</div>
+                        </div>
+
+                        <!-- Low Stock -->
+                        <div class="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white shadow-lg">
+                            <div class="text-red-100 text-sm font-bold uppercase tracking-wider mb-1">Estoque Crítico</div>
+                            <div class="text-3xl font-black">[[ dashboardStats.low_stock ]] <span class="text-lg font-normal">produtos</span></div>
+                            <div class="mt-2 text-xs text-red-100 opacity-80">Abaixo de 3 unidades</div>
+                        </div>
+
+                        <!-- Total Items -->
+                        <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-6 text-white shadow-lg">
+                            <div class="text-emerald-100 text-sm font-bold uppercase tracking-wider mb-1">Total de Itens</div>
+                            <div class="text-3xl font-black">[[ dashboardStats.total_items ]]</div>
+                            <div class="mt-2 text-xs text-emerald-100 opacity-80">Cadastrados no sistema</div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <!-- Top Categories -->
+                        <div class="bg-gray-50 dark:bg-slate-700/50 rounded-xl p-6">
+                            <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Top Categorias</h3>
+                            <div class="space-y-4">
+                                <div v-for="(count, cat) in dashboardStats.top_categories" :key="cat">
+                                    <div class="flex justify-between text-sm mb-1">
+                                        <span class="font-medium text-gray-700 dark:text-gray-300">[[ cat || 'GERAL' ]]</span>
+                                        <span class="text-gray-500">[[ count ]] itens</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 dark:bg-slate-600 rounded-full h-2">
+                                        <div class="bg-primary h-2 rounded-full" :style="{ width: (count / dashboardStats.total_items * 100 * 2) + '%' }"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="bg-gray-50 dark:bg-slate-700/50 rounded-xl p-6 flex flex-col justify-center items-center text-center">
+                            <i class="fas fa-file-invoice text-4xl text-gray-400 mb-4"></i>
+                            <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Relatórios</h3>
+                            <p class="text-sm text-gray-500 mb-6">Gere relatórios para auxiliar na reposição e compras.</p>
+                            
+                            <a href="/print/reposicao" target="_blank" class="w-full py-3 bg-gray-900 hover:bg-black text-white rounded-lg font-bold transition-colors flex items-center justify-center gap-2 shadow-lg">
+                                <i class="fas fa-print"></i>
+                                Relatório de Reposição
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 py-8 mt-auto">
+            <div class="max-w-7xl mx-auto px-4 text-center text-gray-500 dark:text-gray-400 text-sm">
+                <p>&copy; 2025 AquaFlora Agroshop. Todos os direitos reservados.</p>
+                <p class="mt-2">Sistema de Gestão de Estoque v3.0</p>
+            </div>
+        </footer>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório de Reposição - AquaFlora</title>
+    <style>
+        body { font-family: sans-serif; font-size: 12px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .date { font-size: 10px; color: #666; text-align: right; }
+        .critical { color: red; font-weight: bold; }
+        @media print {
+            .no-print { display: none; }
+            body { margin: 0; padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="padding: 10px; background: #eee; text-align: center; margin-bottom: 20px;">
+        <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">🖨️ Imprimir Relatório</button>
+    </div>
+
+    <div class="header">
+        <h1>Relatório de Reposição de Estoque</h1>
+        <p>AquaFlora Agroshop</p>
+    </div>
+
+    <div class="date">Gerado em: {{ date.strftime('%d/%m/%Y %H:%M') }}</div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>SKU</th>
+                <th>Produto</th>
+                <th>Categoria</th>
+                <th>Estoque Atual</th>
+                <th>Sugestão Compra</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in produtos %}
+            <tr>
+                <td>{{ p.SKU }}</td>
+                <td>{{ p.Name }}</td>
+                <td>{{ p.Categories }}</td>
+                <td class="critical">{{ p.Stock }}</td>
+                <td style="width: 100px;">__________</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

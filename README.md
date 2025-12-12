@@ -42,8 +42,7 @@ Sistema de gerenciamento de estoque simples e eficiente, desenvolvido para contr
 ## 🔒 Acesso
 
 O sistema é protegido por senha.
-*   **Senha**: Configurada via variável de ambiente ou no arquivo `.env`.
-*   Consulte o administrador do sistema para obter as credenciais iniciais.
+*   **Senha**: Configurada via variável de ambiente ou no arquivo `.env` com "ADMIN_PASSWORD=".
 
 ## 🛠️ Estrutura do Projeto
 

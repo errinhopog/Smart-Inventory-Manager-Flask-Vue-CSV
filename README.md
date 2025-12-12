@@ -5,8 +5,7 @@
 
 Sistema de gerenciamento de estoque simples e eficiente, desenvolvido para controle de produtos, preços e reposição.
 
-<img width="1192" height="854" alt="image" src="https://github.com/user-attachments/assets/b26ed85a-cda4-4e32-a708-978d0f47510b" />
-
+<img width="1218" height="810" alt="Captura de tela 2025-12-12 120151" src="https://github.com/user-attachments/assets/5cfb3e73-dbe3-421d-b4ed-1fa019ce438e" />
 
 ## ✨ Funcionalidades
 

@@ -1,4 +1,8 @@
 import os
+from dotenv import load_dotenv
+
+# Carrega o .env antes de ler a classe Config
+load_dotenv()
 
 class Config:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
